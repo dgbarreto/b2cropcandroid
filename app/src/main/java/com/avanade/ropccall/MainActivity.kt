@@ -21,10 +21,20 @@ import android.os.StrictMode
 import android.os.StrictMode.ThreadPolicy
 import android.util.Base64
 import android.widget.EditText
+import android.widget.Toast
+import androidx.recyclerview.widget.RecyclerView
+import com.avanade.ropccall.adapters.BrowserListAdapter
+import com.avanade.ropccall.api.Endpoint
+import com.avanade.ropccall.model.RopcCall
+import com.avanade.ropccall.model.TokenResult
+import com.avanade.ropccall.util.NetworkUtil
+import retrofit2.Call
+import retrofit2.Response
 import java.lang.IllegalStateException
 import java.security.MessageDigest
 import java.security.NoSuchAlgorithmException
 import java.util.HashSet
+import javax.security.auth.callback.Callback
 
 
 class MainActivity : AppCompatActivity() {
@@ -32,6 +42,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var buttonListBrowsers : Button
     private lateinit var tvLogin : EditText
     private lateinit var tvPassword : EditText
+    private lateinit var recyclerView : RecyclerView
+    private val dataBrowsers : MutableList<Pair<String,String>> = ArrayList()
+    private lateinit var dataAdapter : BrowserListAdapter
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -41,15 +54,45 @@ class MainActivity : AppCompatActivity() {
         tvLogin = findViewById(R.id.tvUser)
         tvPassword = findViewById(R.id.tvPassword)
         buttonListBrowsers = findViewById(R.id.buttonListBrowsers)
+        recyclerView = findViewById(R.id.rvBrowsers)
+
+        dataAdapter = BrowserListAdapter(dataBrowsers.toTypedArray())
+        recyclerView.adapter = dataAdapter
 
         buttonLogin.setOnClickListener { login() }
         buttonListBrowsers.setOnClickListener { listInstalledBrowsers() }
 
         val policy = ThreadPolicy.Builder().permitAll().build()
         StrictMode.setThreadPolicy(policy)
+
+        tvLogin.setText("danilo@nextdevpoc.onmicrosoft.com")
+        tvPassword.setText("M@ri0Br0s2")
     }
 
     fun login(){
+        val retrofitClient = NetworkUtil.getRetrofitInstance("https://nextdevpoc.b2clogin.com")
+        val endpoint = retrofitClient.create(Endpoint::class.java)
+
+        val callback = endpoint.authenticate(tvLogin.text.toString(),
+            tvPassword.text.toString(),
+           "password",
+           "openid 68646994-3950-4f4e-a1ec-47a108d27b3a",
+           "68646994-3950-4f4e-a1ec-47a108d27b3a",
+           "token id_token")
+
+        callback.enqueue(object : retrofit2.Callback<TokenResult> {
+            override fun onResponse(call: Call<TokenResult>, response: Response<TokenResult>) {
+                Toast.makeText(baseContext, "Token: ${response.body()?.accessToken}", Toast.LENGTH_LONG).show()
+            }
+
+            override fun onFailure(call: Call<TokenResult>, t: Throwable) {
+                println("Erro ao fazer a chamada")
+            }
+
+        })
+    }
+
+    fun loginOld(){
         val url = URL("https://nextdevpoc.b2clogin.com/nextdevpoc.onmicrosoft.com/oauth2/v2.0/token?p=b2c_1_ropc_auth")
         var params = URLEncoder.encode("username", "UTF-8") + "=" + URLEncoder.encode(tvLogin.text.toString(), "UTF-8")
         params += "&" + URLEncoder.encode("password", "UTF-8") + "=" + URLEncoder.encode(tvPassword.text.toString(), "UTF-8")
@@ -91,8 +134,13 @@ class MainActivity : AppCompatActivity() {
         while(activities.hasNext()){
             info = activities.next()
             packageInfo = packageManager.getPackageInfo(info.activityInfo.packageName, PackageManager.GET_SIGNATURES)
-            generateSignatureHash(packageInfo.signatures)
+            var signatures = generateSignatureHash(packageInfo.signatures)
+            dataBrowsers.add(Pair<String,String>(packageInfo.packageName, signatures.toString()))
         }
+
+        dataAdapter = BrowserListAdapter(dataBrowsers.toTypedArray())
+        recyclerView.adapter = dataAdapter
+        dataAdapter.notifyDataSetChanged()
     }
 
     fun generateSignatureHash(signatures : Array<Signature>):  Set<String>{
