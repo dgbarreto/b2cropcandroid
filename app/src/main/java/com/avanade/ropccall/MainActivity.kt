@@ -64,9 +64,6 @@ class MainActivity : AppCompatActivity() {
 
         val policy = ThreadPolicy.Builder().permitAll().build()
         StrictMode.setThreadPolicy(policy)
-
-        tvLogin.setText("danilo@nextdevpoc.onmicrosoft.com")
-        tvPassword.setText("M@ri0Br0s2")
     }
 
     fun login(){
